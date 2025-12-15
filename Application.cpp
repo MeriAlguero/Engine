@@ -30,10 +30,10 @@ bool Application::init()
     lastMilis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
 	return ret;
-}
+}/*
 bool Application::postInit() {
 
-}
+}*/
 
 void Application::update()
 {
@@ -73,4 +73,16 @@ bool Application::cleanUp()
 		ret = (*it)->cleanUp();
 
 	return ret;
+}
+ModuleD3D12* Application::getD3D12() const
+{
+    
+    for (Module* module : modules) {
+       
+        ModuleD3D12* d3d12 = dynamic_cast<ModuleD3D12*>(module);
+        if (d3d12 != nullptr) {
+            return d3d12; // Encontramos el módulo D3D12, lo devolvemos
+        }
+    }
+    return nullptr;
 }

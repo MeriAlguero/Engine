@@ -7,6 +7,7 @@
 #include <chrono>
 
 class Module;
+class ModuleD3D12;
 
 class Application
 {
@@ -16,10 +17,11 @@ public:
 	~Application();
 
 	bool         init();
-    bool         postInit();
+   // bool         postInit();
 	void         update();
 	bool         cleanUp();
-
+    
+    ModuleD3D12* getD3D12() const;
     
     float                       getFPS() const { return 1000.0f * float(MAX_FPS_TICKS) / tickSum; }
     float                       getAvgElapsedMs() const { return tickSum / float(MAX_FPS_TICKS); }

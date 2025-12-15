@@ -181,7 +181,6 @@
     <ClInclude Include="Module.h" />
     <ClInclude Include="ModuleD3D12.h" />
     <ClInclude Include="ModuleInput.h" />
-    <ClInclude Include="ModuleRenderer.h" />
     <ClInclude Include="Mouse.h" />
     <ClInclude Include="PlatformHelpers.h" />
     <ClInclude Include="ReadData.h" />
@@ -272,7 +271,6 @@
     <ClCompile Include="Keyboard.cpp" />
     <ClCompile Include="ModuleD3D12.cpp" />
     <ClCompile Include="ModuleInput.cpp" />
-    <ClCompile Include="ModuleRenderer.cpp" />
     <ClCompile Include="Mouse.cpp" />
     <ClCompile Include="SimpleMath.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
