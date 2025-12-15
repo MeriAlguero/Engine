@@ -225,7 +225,15 @@ bool ModuleD3D12::createDevice(bool useWarp)
 
     return ok;
 }
-void ModuleD3D12::preRender(){}
+void ModuleD3D12::preRender()
+{
+    if (fenceValue != 0)
+    {
+        HRESULT hr = fence->SetEventOnCompletion(fenceValue, fenceEvent);
+        WaitForSingleObject(fenceEvent, INFINITE);
+    }
+    commandAllocator->Reset();
+}
 void ModuleD3D12::render()
 {
     ModuleD3D12* d3d12 = app->getD3D12();
@@ -252,8 +260,10 @@ void ModuleD3D12::postRender()
 {
 
     swapChain->Present(1, 0);
-
-    flush();
+    ++fenceValue;
+    HRESULT hr = commandQueue->Signal(fence.Get(), fenceValue);
+    currentFrame = swapChain->GetCurrentBackBufferIndex();
+    //flush();
 }
 
 ID3D12GraphicsCommandList* ModuleD3D12::getCommandList() const { return commandList.Get(); }
