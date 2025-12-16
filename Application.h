@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Globals.h"
+#include "Module.h"
+#include "ModuleResource.h"
 
 #include <array>
 #include <vector>
@@ -17,11 +19,12 @@ public:
 	~Application();
 
 	bool         init();
-   // bool         postInit();
+    //bool         postInit();
 	void         update();
 	bool         cleanUp();
     
     ModuleD3D12* getD3D12() const;
+    ModuleResource* getResources() const;
     
     float                       getFPS() const { return 1000.0f * float(MAX_FPS_TICKS) / tickSum; }
     float                       getAvgElapsedMs() const { return tickSum / float(MAX_FPS_TICKS); }
@@ -42,6 +45,8 @@ private:
     uint64_t  tickSum = 0;
     uint64_t  elapsedMilis = 0;
     bool      paused = false;
+
+    ModuleResource* m_resources = nullptr;
 };
 
 extern Application* app;

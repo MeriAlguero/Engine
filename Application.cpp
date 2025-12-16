@@ -2,12 +2,16 @@
 #include "Application.h"
 #include "ModuleInput.h"
 #include "ModuleD3D12.h"
+#include "ModuleResource.h"
 
 
 Application::Application(int argc, wchar_t** argv, void* hWnd)
 {
+    m_resources = new ModuleResource();
     modules.push_back(new ModuleInput((HWND)hWnd));
     modules.push_back(new ModuleD3D12((HWND)hWnd));
+    modules.push_back(m_resources);
+    
 }
 
 Application::~Application()
@@ -30,8 +34,8 @@ bool Application::init()
     lastMilis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
 	return ret;
-}/*
-bool Application::postInit() {
+}
+/*bool Application::postInit() {
 
 }*/
 
@@ -85,4 +89,9 @@ ModuleD3D12* Application::getD3D12() const
         }
     }
     return nullptr;
+}
+
+ModuleResource* Application::getResources() const
+{
+    return m_resources;
 }

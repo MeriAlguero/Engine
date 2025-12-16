@@ -10,6 +10,8 @@ class ModuleD3D12 : public Module
 private:
     /*WINDOW*/
     HWND hWnd = NULL;
+    uint32_t windowWidth = 0;
+    uint32_t windowHeight = 0;
     /*Core DX12*/
     ComPtr<IDXGIFactory6> factory;
     ComPtr<IDXGIAdapter4> adapter;
@@ -24,28 +26,32 @@ private:
     static constexpr uint32_t BACK_BUFFER_COUNT = 2; //Numero de Buffers
     ComPtr<IDXGISwapChain4> swapChain; // El objeto que gestiona la presentación
     uint32_t currentFrame = 0; // Índice del buffer actual
-    ComPtr<ID3D12DescriptorHeap> rtvHeap; // <-- Define el Heap de descriptores
-    uint32_t rtvDescriptorSize = 0; // <-- Define el tamaño del descriptor
+    ComPtr<ID3D12DescriptorHeap> rtvHeap; //Define el Heap de descriptores
+    uint32_t rtvDescriptorSize = 0; //Define el tamaño del descriptor
 
     ComPtr<ID3D12Resource> renderTargets[BACK_BUFFER_COUNT]; // Array para guardar los Back Buffers
     
-    ComPtr<ID3D12Fence> fence;              // <-- Resuelve 'fence' no definido
+    ComPtr<ID3D12Fence> fence;   //Resuelve 'fence' no definido
     uint64_t fenceValue = 0;
     HANDLE fenceEvent;
     
     
-    /*
+    //RECURSOS PARA LA GEOMETRIA
     ComPtr<ID3D12Resource> vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-    ComPtr<ID3D12Resource> bufferUploadHeap;
+    D3D12_VERTEX_BUFFER_VIEW vertexBufferView; //Vista enlazar la geometria
+    ComPtr<ID3D12Resource> bufferUploadHeap; //Buffer temporal para subida datos (Staging Buffer)
+    //PIPELINE
     ComPtr<ID3D12RootSignature> rootSignature;
-    ComPtr<ID3D12PipelineState> pso;*/
-
+    ComPtr<ID3D12PipelineState> pso;
+    uint32_t vertexCount = 0; //Contador de vértices a dibujar
   
 public:
 
     ModuleD3D12(HWND hWnd);
     ~ModuleD3D12();
+
+    uint32_t getWindowWidth() const { return windowWidth; }
+    uint32_t getWindowHeight() const { return windowHeight; }
 
     bool init() override;
     void preRender() override;
@@ -53,6 +59,10 @@ public:
     void postRender() override;
     
     bool flush();
+
+    ID3D12Device5* getDevice() const;// Per obtenir el device D3D12 
+    uint32_t getCurrentFrame() const; // Per saber l'índex del frame actual
+    UINT getLastCompletedFrame() const; //Per al deffered release
 
     ID3D12GraphicsCommandList* getCommandList() const; //Obtiene la lista de comandos para grabar
     ID3D12CommandAllocator* getCommandAllocator() const; //Para rastrear la lista de comandos
@@ -67,4 +77,8 @@ private:
     bool createFactory();
     bool createDevice(bool useWarp);
     
+    //Funcions de Creació
+    bool createVertexBuffer();
+    bool createRootSignature();
+    bool createPSO();
 };

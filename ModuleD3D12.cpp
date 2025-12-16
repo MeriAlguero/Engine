@@ -1,7 +1,7 @@
 #include "Globals.h"
 #include "Application.h"
 #include "ModuleD3D12.h"
-
+#include "ReadData.h"
 
 //#include "ModuleSamplers.h"
 //#include "ModuleCamera.h"
@@ -25,7 +25,6 @@ bool ModuleD3D12::init()
     enableDebugLayer();
 #endif 
 
-   //getWindowSize(windowWidth, windowHeight);
 
     bool ok = createFactory();
     ok = ok && createDevice(false);
@@ -143,7 +142,15 @@ bool ModuleD3D12::init()
             ok = false;
         }
     }
-    return ok;
+
+    //CREACIO TRIANGLE
+    bool ok_triangle = createVertexBuffer();
+    ok_triangle = ok_triangle && createRootSignature();
+    ok_triangle = ok_triangle && createPSO();
+
+    return ok && ok_triangle;
+
+
 }
 
 bool ModuleD3D12::flush()
@@ -227,6 +234,7 @@ bool ModuleD3D12::createDevice(bool useWarp)
 }
 void ModuleD3D12::preRender()
 {
+    //Esperar solo si no es el frame inicial
     if (fenceValue != 0)
     {
         HRESULT hr = fence->SetEventOnCompletion(fenceValue, fenceEvent);
@@ -234,6 +242,7 @@ void ModuleD3D12::preRender()
     }
     commandAllocator->Reset();
 }
+/*
 void ModuleD3D12::render()
 {
     ModuleD3D12* d3d12 = app->getD3D12();
@@ -254,7 +263,58 @@ void ModuleD3D12::render()
     ID3D12CommandList* commandLists[] = { commandList };
     d3d12->getDrawCommandQueue()->ExecuteCommandLists(UINT(std::size(commandLists)), commandLists);
     
+    }*/
+
+void ModuleD3D12::render()
+{
+    // Aquesta funció ha de gestionar la llista de comandes, barreres i dibuix
+
+    ID3D12GraphicsCommandList* commandList = getCommandList();
+
+    // 1. Reset i PSO
+    // NOTA: Passar el PSO permet configurar la Pipeline al Reset
+    commandList->Reset(getCommandAllocator(), pso.Get());
+
+    // 2. Transició: PRESENT -> RENDER_TARGET
+    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    commandList->ResourceBarrier(1, &barrier);
+
+    //Configurar Viewport i Scissor
+    LONG width = (LONG)getWindowWidth(); // Substitueix pel teu mètode per obtenir l'amplada
+    LONG height = (LONG)getWindowHeight(); // Substitueix pel teu mètode per obtenir l'alçada
+
+    D3D12_VIEWPORT viewport{ 0.0, 0.0, float(width),  float(height) , 0.0, 1.0 };
+    D3D12_RECT scissor{ 0, 0, width, height };
+
+    float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f }; // Color gris fosc
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = getRenderTargetDescriptor();
+
+    commandList->RSSetViewports(1, &viewport);
+    commandList->RSSetScissorRects(1, &scissor);
+
+    //Enllaçar Render Target i Netejar
+    commandList->OMSetRenderTargets(1, &rtv, false, nullptr);
+    commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+
+    //Enllaçar Root Signature i Vertex Buffer
+    commandList->SetGraphicsRootSignature(rootSignature.Get());
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+
+    //Dibuix
+    commandList->DrawInstanced(vertexCount, 1, 0, 0);
+
+    //Transició: RENDER_TARGET -> PRESENT
+    barrier = CD3DX12_RESOURCE_BARRIER::Transition(getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+    commandList->ResourceBarrier(1, &barrier);
+
+    //Tancar i Executar
+    if (SUCCEEDED(commandList->Close()))
+    {
+        ID3D12CommandList* commandLists[] = { commandList };
+        getDrawCommandQueue()->ExecuteCommandLists(UINT(std::size(commandLists)), commandLists);
     }
+}
 
 void ModuleD3D12::postRender()
 {
@@ -266,10 +326,89 @@ void ModuleD3D12::postRender()
     //flush();
 }
 
+bool ModuleD3D12::createVertexBuffer()
+{
+    struct Vertex
+    {
+        float x, y, z;
+    };
+
+    static Vertex vertices[3] =
+    {
+        {-1.0f, -1.0f, 0.0f }, // 0
+        { 0.0f, 1.0f, 0.0f  }, // 1
+        { 1.0f, -1.0f, 0.0f }  // 2
+    };
+
+    // Assumeix que app->getResources() existeix i té la funció createDefaultBuffer
+    vertexBuffer = app->getResources()->createDefaultBuffer(vertices, sizeof(vertices), "TriangleVertexBuffer");
+    vertexCount = 3;
+
+    if (!vertexBuffer) return false;
+
+    vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
+    vertexBufferView.StrideInBytes = sizeof(Vertex);
+    vertexBufferView.SizeInBytes = sizeof(vertices);
+
+    return true;
+}
+bool ModuleD3D12::createRootSignature()
+{
+    CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+    // La signatura arrel és buida, només permet el Input Layout
+    rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+    ComPtr<ID3DBlob> rootSignatureBlob;
+
+    if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootSignatureBlob, nullptr)))
+    {
+        return false;
+    }
+
+    // Crida al teu getDevice()
+    if (FAILED(getDevice()->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature))))
+    {
+        return false;
+    }
+
+    return true;
+}
+bool ModuleD3D12::createPSO()
+{
+    // Input Layout: Només té la posició (MY_POSITION) com indica el professor
+    D3D12_INPUT_ELEMENT_DESC inputLayout[] = { {"MY_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+
+    // Lectura dels Shaders
+    auto dataVS = DX::ReadData(L"BasicTransformVS.cso");
+    auto dataPS = DX::ReadData(L"SolidColorPS.cso");
+
+    // Descripció de la Pipeline
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout = { inputLayout, sizeof(inputLayout) / sizeof(D3D12_INPUT_ELEMENT_DESC) };
+    psoDesc.pRootSignature = rootSignature.Get();
+    psoDesc.VS = { dataVS.data(), dataVS.size() };
+    psoDesc.PS = { dataPS.data(), dataPS.size() };
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoDesc.SampleDesc = { 1, 0 };
+    psoDesc.SampleMask = 0xffffffff;
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.NumRenderTargets = 1;
+
+    // Crear el PSO
+    return SUCCEEDED(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
+}
+
+ID3D12Device5* ModuleD3D12::getDevice() const { return device.Get(); }
+uint32_t ModuleD3D12::getCurrentFrame() const { return currentFrame; }
+UINT ModuleD3D12::getLastCompletedFrame() const { return (UINT)fence->GetCompletedValue();}
+
 ID3D12GraphicsCommandList* ModuleD3D12::getCommandList() const { return commandList.Get(); }
 ID3D12CommandAllocator* ModuleD3D12::getCommandAllocator() const { return commandAllocator.Get(); }
 ID3D12CommandQueue* ModuleD3D12::getDrawCommandQueue() const { return commandQueue.Get(); }
 ID3D12Resource* ModuleD3D12::getBackBuffer() const { return renderTargets[currentFrame].Get(); }
+
 D3D12_CPU_DESCRIPTOR_HANDLE ModuleD3D12::getRenderTargetDescriptor() const {
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtvHeap->GetCPUDescriptorHandleForHeapStart());
     rtvHandle.Offset(currentFrame * rtvDescriptorSize);
