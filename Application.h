@@ -10,6 +10,7 @@
 
 class Module;
 class ModuleD3D12;
+class ModuleImGui;
 
 class Application
 {
@@ -25,6 +26,7 @@ public:
     
     ModuleD3D12* getD3D12() const;
     ModuleResource* getResources() const;
+    ModuleImGui* getImGui() const { return m_imgui; }
     
     float                       getFPS() const { return 1000.0f * float(MAX_FPS_TICKS) / tickSum; }
     float                       getAvgElapsedMs() const { return tickSum / float(MAX_FPS_TICKS); }
@@ -33,6 +35,7 @@ public:
     bool                        isPaused() const { return paused; }
     bool                        setPaused(bool p) { paused = p; return paused; }
 
+    void* getWindow() const { return window; }
 private:
     enum { MAX_FPS_TICKS = 30 };
     typedef std::array<uint64_t, MAX_FPS_TICKS> TickList;
@@ -46,7 +49,10 @@ private:
     uint64_t  elapsedMilis = 0;
     bool      paused = false;
 
+    void* window = nullptr;
+
     ModuleResource* m_resources = nullptr;
+    ModuleImGui* m_imgui = nullptr;
 };
 
 extern Application* app;

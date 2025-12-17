@@ -3,15 +3,17 @@
 #include "ModuleInput.h"
 #include "ModuleD3D12.h"
 #include "ModuleResource.h"
+#include "ModuleImGui.h"
 
 
 Application::Application(int argc, wchar_t** argv, void* hWnd)
 {
-    m_resources = new ModuleResource();
     modules.push_back(new ModuleInput((HWND)hWnd));
     modules.push_back(new ModuleD3D12((HWND)hWnd));
-    modules.push_back(m_resources);
-    
+    m_imgui = new ModuleImGui();
+    modules.push_back(m_imgui);
+    modules.push_back(m_resources = new ModuleResource());
+    this->window = hWnd;
 }
 
 Application::~Application()
@@ -95,3 +97,4 @@ ModuleResource* Application::getResources() const
 {
     return m_resources;
 }
+

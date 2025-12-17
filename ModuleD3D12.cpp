@@ -1,6 +1,7 @@
 #include "Globals.h"
 #include "Application.h"
 #include "ModuleD3D12.h"
+#include "ModuleImGui.h"
 #include "ReadData.h"
 
 //#include "ModuleSamplers.h"
@@ -148,6 +149,7 @@ bool ModuleD3D12::init()
     ok_triangle = ok_triangle && createRootSignature();
     ok_triangle = ok_triangle && createPSO();
 
+  
     return ok && ok_triangle;
 
 
@@ -241,6 +243,7 @@ void ModuleD3D12::preRender()
         WaitForSingleObject(fenceEvent, INFINITE);
     }
     commandAllocator->Reset();
+
 }
 /*
 void ModuleD3D12::render()
@@ -267,53 +270,45 @@ void ModuleD3D12::render()
 
 void ModuleD3D12::render()
 {
-    // Aquesta funció ha de gestionar la llista de comandes, barreres i dibuix
+
 
     ID3D12GraphicsCommandList* commandList = getCommandList();
-
-    // 1. Reset i PSO
-    // NOTA: Passar el PSO permet configurar la Pipeline al Reset
     commandList->Reset(getCommandAllocator(), pso.Get());
 
-    // 2. Transició: PRESENT -> RENDER_TARGET
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     commandList->ResourceBarrier(1, &barrier);
 
-    //Configurar Viewport i Scissor
-    LONG width = (LONG)getWindowWidth(); // Substitueix pel teu mètode per obtenir l'amplada
-    LONG height = (LONG)getWindowHeight(); // Substitueix pel teu mètode per obtenir l'alçada
+    LONG width = (LONG)getWindowWidth();
+    LONG height = (LONG)getWindowHeight(); 
 
     D3D12_VIEWPORT viewport{ 0.0, 0.0, float(width),  float(height) , 0.0, 1.0 };
     D3D12_RECT scissor{ 0, 0, width, height };
 
-    float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f }; // Color gris fosc
+    float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = getRenderTargetDescriptor();
 
     commandList->RSSetViewports(1, &viewport);
     commandList->RSSetScissorRects(1, &scissor);
 
-    //Enllaçar Render Target i Netejar
+
     commandList->OMSetRenderTargets(1, &rtv, false, nullptr);
     commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
 
-    //Enllaçar Root Signature i Vertex Buffer
     commandList->SetGraphicsRootSignature(rootSignature.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
-    //Dibuix
     commandList->DrawInstanced(vertexCount, 1, 0, 0);
 
-    //Transició: RENDER_TARGET -> PRESENT
     barrier = CD3DX12_RESOURCE_BARRIER::Transition(getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     commandList->ResourceBarrier(1, &barrier);
 
-    //Tancar i Executar
     if (SUCCEEDED(commandList->Close()))
     {
         ID3D12CommandList* commandLists[] = { commandList };
         getDrawCommandQueue()->ExecuteCommandLists(UINT(std::size(commandLists)), commandLists);
     }
+
 }
 
 void ModuleD3D12::postRender()
@@ -345,6 +340,7 @@ bool ModuleD3D12::createVertexBuffer()
     vertexCount = 3;
 
     if (!vertexBuffer) return false;
+   // app->getResources()->flushResourceCommands();
 
     vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
     vertexBufferView.StrideInBytes = sizeof(Vertex);
