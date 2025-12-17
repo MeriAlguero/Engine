@@ -41,39 +41,26 @@ void ModuleImGui::render()
 {
     auto d3d12 = app->getD3D12();
     auto cmdList = d3d12->getCommandList();
-    auto cmdAlloc = d3d12->getCommandAllocator();
-
-    cmdList->Reset(cmdAlloc, nullptr);
 
     drawMainMenuBar();
     drawConfigurationWindow();
-    if (ImGui::Begin("Editor")) {
-        ImGui::Text("Hello from ImGui!");
-    }
-    ImGui::End();
 
-    ImGui::Render();
+    imguiPass->record(cmdList);
 
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        d3d12->getBackBuffer(),
-        D3D12_RESOURCE_STATE_PRESENT,
-        D3D12_RESOURCE_STATE_RENDER_TARGET);
+        d3d12->getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     cmdList->ResourceBarrier(1, &barrier);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = d3d12->getRenderTargetDescriptor();
-    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-   
-    imguiPass->record(cmdList);
-    
-    barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        d3d12->getBackBuffer(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        D3D12_RESOURCE_STATE_PRESENT);
-    cmdList->ResourceBarrier(1, &barrier);
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = d3d12->getDepthStencilDescriptor();
 
-    cmdList->Close();
-    ID3D12CommandList* lists[] = { cmdList };
-    d3d12->getDrawCommandQueue()->ExecuteCommandLists(1, lists);
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    imguiPass->record(cmdList);
+
+    barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        d3d12->getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+    cmdList->ResourceBarrier(1, &barrier);
 }
 
 void ModuleImGui::postRender()

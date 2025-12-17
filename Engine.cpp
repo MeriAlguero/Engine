@@ -7,6 +7,7 @@
 #include "Engine.h"
 
 #include "Application.h"
+#include "ModuleD3D12.h"
 
 #include <shellapi.h>
 
@@ -225,6 +226,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         else {
             app->setPaused(false);
+
+            uint32_t width = (uint32_t)LOWORD(lParam);
+            uint32_t height = (uint32_t)HIWORD(lParam);
+
+            if (app != nullptr && app->getD3D12() != nullptr)
+            {
+                app->getD3D12()->resize(width, height);
+            }
         }
         break;
     case WM_SYSKEYDOWN:
