@@ -180,6 +180,7 @@
     <ClInclude Include="ImGuiPass.h" />
     <ClInclude Include="Keyboard.h" />
     <ClInclude Include="Module.h" />
+    <ClInclude Include="ModuleCamera.h" />
     <ClInclude Include="ModuleD3D12.h" />
     <ClInclude Include="ModuleImGui.h" />
     <ClInclude Include="ModuleInput.h" />
@@ -273,6 +274,7 @@
     </ClCompile>
     <ClCompile Include="ImGuiPass.cpp" />
     <ClCompile Include="Keyboard.cpp" />
+    <ClCompile Include="ModuleCamera.cpp" />
     <ClCompile Include="ModuleD3D12.cpp" />
     <ClCompile Include="ModuleImGui.cpp" />
     <ClCompile Include="ModuleInput.cpp" />

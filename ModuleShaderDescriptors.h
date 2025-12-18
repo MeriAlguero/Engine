@@ -24,12 +24,12 @@ private:
 class ModuleShaderDescriptors : public Module {
 public:
     bool init() override;
-    DescriptorTable allocTable(UINT size = 1); // Reserva espacio para N texturas
+    DescriptorTable allocTable(UINT size = 1); 
     ID3D12DescriptorHeap* getHeap() const { return heap.Get(); }
 
 private:
     ComPtr<ID3D12DescriptorHeap> heap;
     UINT currentDescriptorIndex = 0;
     UINT descriptorSize = 0;
-    static const UINT MAX_DESCRIPTORS = 1024; // Espacio de sobra
+    static const UINT MAX_DESCRIPTORS = 1024; 
 };

@@ -10,7 +10,7 @@ bool ModuleShaderDescriptors::init() {
     D3D12_DESCRIPTOR_HEAP_DESC desc = {};
     desc.NumDescriptors = MAX_DESCRIPTORS;
     desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE; // ¡Crucial para que el shader lo vea!
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
     return SUCCEEDED(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&heap)));
 }
@@ -21,7 +21,6 @@ DescriptorTable ModuleShaderDescriptors::allocTable(UINT size) {
     return table;
 }
 
-// Implementación de la tabla auxiliar
 DescriptorTable::DescriptorTable(ID3D12Device* dev, ID3D12DescriptorHeap* h, UINT idx, UINT size)
     : device(dev), heap(h), index(idx), descriptorSize(size) {}
 

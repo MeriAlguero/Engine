@@ -8,6 +8,7 @@
 
 #include "Application.h"
 #include "ModuleD3D12.h"
+#include "ModuleCamera.h"
 
 #include <shellapi.h>
 
@@ -230,9 +231,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             uint32_t width = (uint32_t)LOWORD(lParam);
             uint32_t height = (uint32_t)HIWORD(lParam);
 
-            if (app != nullptr && app->getD3D12() != nullptr)
+            if (app != nullptr)
             {
-                app->getD3D12()->resize(width, height);
+                if (app->getD3D12() != nullptr)
+                    app->getD3D12()->resize(width, height);
+                
+                if (app->getCamera() != nullptr)
+                    app->getCamera()->SetAspectRatio((float)width / (float)height);
             }
         }
         break;

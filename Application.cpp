@@ -4,19 +4,27 @@
 #include "ModuleD3D12.h"
 #include "ModuleResource.h"
 #include "ModuleImGui.h"
+#include "ModuleCamera.h"
 
 
 Application::Application(int argc, wchar_t** argv, void* hWnd)
 {
-    shaderDescriptors = new ModuleShaderDescriptors();
-    modules.push_back(new ModuleInput((HWND)hWnd));
-    modules.push_back(new ModuleD3D12((HWND)hWnd));
-    modules.push_back(shaderDescriptors);
-
-    m_imgui = new ModuleImGui();
-    modules.push_back(m_imgui);
-    modules.push_back(m_resources = new ModuleResource());
     this->window = hWnd;
+
+    d3d12 = new ModuleD3D12((HWND)hWnd);
+    shaderDescriptors = new ModuleShaderDescriptors();
+    camera = new ModuleCamera();
+    input = new ModuleInput((HWND)hWnd);
+    m_imgui = new ModuleImGui();
+    m_resources = new ModuleResource();
+
+    modules.push_back(d3d12);
+    modules.push_back(shaderDescriptors);
+    modules.push_back(input);
+    modules.push_back(camera);
+    modules.push_back(m_resources);
+    modules.push_back(m_imgui);
+   
 }
 
 Application::~Application()

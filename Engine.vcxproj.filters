@@ -29,6 +29,7 @@
     <ClCompile Include="ModuleD3D12.cpp" />
     <ClCompile Include="ModuleResource.cpp" />
     <ClCompile Include="ModuleShaderDescriptors.cpp" />
+    <ClCompile Include="ModuleCamera.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3rdParty\imgui-1.89.8\backends\imgui_impl_win32.h" />
@@ -58,6 +59,7 @@
     <ClInclude Include="ModuleD3D12.h" />
     <ClInclude Include="ModuleResource.h" />
     <ClInclude Include="ModuleShaderDescriptors.h" />
+    <ClInclude Include="ModuleCamera.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Engine.rc" />
