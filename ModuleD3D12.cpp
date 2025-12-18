@@ -125,13 +125,13 @@ bool ModuleD3D12::init()
 
         if (ok_triangle)
         {
-           /* textureDog = app->getResources()->createTextureFromFile(L"../Game/Assets/Textures/dog.dds");
+            /* textureDog = app->getResources()->createTextureFromFile(L"../Game/Assets/Textures/dog.dds");
 
-                if (textureDog)
-                {
-                    dogDescriptor = app->getShaderDescriptors()->allocTable(1);
-                    dogDescriptor.createTextureSRV(textureDog.Get());
-                }*/
+                 if (textureDog)
+                 {
+                     dogDescriptor = app->getShaderDescriptors()->allocTable(1);
+                     dogDescriptor.createTextureSRV(textureDog.Get());
+                 }*/
         }
 
         commandList->Close();
@@ -146,17 +146,44 @@ bool ModuleD3D12::init()
 
 void ModuleD3D12::render()
 {
-    using namespace DirectX::SimpleMath;
-
-    if (!commandList || !commandAllocator || !pso || !debugDraw) return;
+    if (!commandList || !pso) return;
 
     float w = (float)windowWidth;
     float h = (float)windowHeight;
     D3D12_VIEWPORT vp{ 0.0f, 0.0f, w, h, 0.0f, 1.0f };
     D3D12_RECT sr{ 0, 0, (LONG)w, (LONG)h };
-
     commandList->RSSetViewports(1, &vp);
     commandList->RSSetScissorRects(1, &sr);
+
+    commandList->SetPipelineState(pso.Get());
+    commandList->SetGraphicsRootSignature(rootSignature.Get());
+
+    auto camera = app->getCamera();
+    DirectX::SimpleMath::Matrix mvp = (DirectX::SimpleMath::Matrix::Identity * camera->getViewMatrix() * camera->getProjectionMatrix()).Transpose();
+    commandList->SetGraphicsRoot32BitConstants(0, 16, &mvp, 0);
+
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+    commandList->DrawInstanced(6, 1, 0, 0);
+
+    if (showGrid) {
+        dd::xzSquareGrid(-10.0f, 10.0f, 0.0f, 1.0f, dd::colors::LightGray);
+    }
+    if (showAxis) {
+        DirectX::SimpleMath::Matrix id = DirectX::SimpleMath::Matrix::Identity;
+        dd::axisTriad(&id._11, 0.1f, 1.5f);
+    }
+
+    debugDraw->record(commandList.Get(), (uint32_t)windowWidth, (uint32_t)windowHeight, camera->getViewMatrix(), camera->getProjectionMatrix()); 
+}
+
+void ModuleD3D12::preRender() {
+    flush();
+
+    currentFrame = swapChain->GetCurrentBackBufferIndex();
+
+    commandAllocator->Reset();
+    commandList->Reset(commandAllocator.Get(), pso.Get());
 
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -169,52 +196,6 @@ void ModuleD3D12::render()
     float clearColor[] = { 0.1f, 0.1f, 0.2f, 1.0f };
     commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-    commandList->SetPipelineState(pso.Get());
-    commandList->SetGraphicsRootSignature(rootSignature.Get());
-
-    auto camera = app->getCamera();
-    view = camera->getViewMatrix();
-    proj = camera->getProjectionMatrix();
-
-    Matrix mvp = (Matrix::Identity * view * proj).Transpose();
-    commandList->SetGraphicsRoot32BitConstants(0, 16, &mvp, 0);
-
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-    commandList->DrawInstanced(vertexCount, 1, 0, 0);
-
-    /*
-    auto shaderDescriptors = app->getShaderDescriptors();
-    if (shaderDescriptors != nullptr && textureDog != nullptr) {
-        ID3D12DescriptorHeap* heap = shaderDescriptors->getHeap();
-        ID3D12DescriptorHeap* heaps[] = { heap };
-        commandList->SetDescriptorHeaps(1, heaps);
-        commandList->SetGraphicsRootDescriptorTable(1, dogDescriptor.getGPUHandle());
-    }*/
-
-
-    dd::xzSquareGrid(-10.0f, 10.0f, 0.0f, 1.0f, dd::colors::LightGray);
-    
-    Matrix id = Matrix::Identity;
-    dd::axisTriad(&id._11, 0.1f, 1.5f); 
-
-    Vector3 origin = { 0,0,0 };
-    Vector3 dest = { 1,0,0 };
-    dd::line(&origin.x, &dest.x, dd::colors::Red);
-
-    debugDraw->record(commandList.Get(), (uint32_t)windowWidth, (uint32_t)windowHeight, view, proj);
-
-    CD3DX12_RESOURCE_BARRIER barrierPresent = CD3DX12_RESOURCE_BARRIER::Transition(
-        getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-    commandList->ResourceBarrier(1, &barrierPresent);
-}
-
-void ModuleD3D12::preRender() {
-    flush();
-    currentFrame = swapChain->GetCurrentBackBufferIndex();
-    commandAllocator->Reset();
-    commandList->Reset(commandAllocator.Get(), pso.Get());
 }
 
 void ModuleD3D12::postRender() {
@@ -254,7 +235,7 @@ bool ModuleD3D12::createFactory() {
 #if defined(_DEBUG)
     flags = DXGI_CREATE_FACTORY_DEBUG;
 #endif
-    
+
     return SUCCEEDED(CreateDXGIFactory2(flags, IID_PPV_ARGS(&factory)));
 }
 
@@ -264,69 +245,63 @@ bool ModuleD3D12::createDevice(bool useWarp) {
         factory->EnumWarpAdapter(IID_PPV_ARGS(&adp));
         return SUCCEEDED(D3D12CreateDevice(adp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device)));
     }
-    
+
     ComPtr<IDXGIAdapter4> adp;
     factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adp));
-   
+
     return SUCCEEDED(D3D12CreateDevice(adp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device)));
 }
 
-struct Vertex {
-    float x, y, z;
-    float u, v;
-};
+
 
 bool ModuleD3D12::createVertexBuffer() {
-    
+
+    struct Vertex {
+        Vector3 position;
+        Vector2 uv;
+    };
+
     static Vertex vertices[6] = {
 
-        { -0.5f,  0.5f, 0.0f,  0.0f, 0.0f }, // Top-left
-        {  0.5f, -0.5f, 0.0f,  1.0f, 1.0f }, // Bottom-right
-        { -0.5f, -0.5f, 0.0f,  0.0f, 1.0f }, // Bottom-left
-
-        { -0.5f,  0.5f, 0.0f,  0.0f, 0.0f }, // Top-left
-        {  0.5f,  0.5f, 0.0f,  1.0f, 0.0f }, // Top-right
-        {  0.5f, -0.5f, 0.0f,  1.0f, 1.0f }  // Bottom-right
+        { Vector3(-1.0f, -1.0f, 0.0f), Vector2(-0.2f, 1.2f) },
+        { Vector3(-1.0f, 1.0f, 0.0f), Vector2(-0.2f, -0.2f) },
+        { Vector3(1.0f, 1.0f, 0.0f), Vector2(1.2f, -0.2f) },
+        { Vector3(-1.0f, -1.0f, 0.0f), Vector2(-0.2f, 1.2f) },
+        { Vector3(1.0f, 1.0f, 0.0f), Vector2(1.2f, -0.2f) },
+        { Vector3(1.0f, -1.0f, 0.0f), Vector2(1.2f, 1.2f) }
     };
 
     vertexBuffer = app->getResources()->createDefaultBuffer(vertices, sizeof(vertices), "QuadVB");
     vertexCount = 6;
-   
+
     if (!vertexBuffer) return false;
     vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
     vertexBufferView.StrideInBytes = sizeof(Vertex);
     vertexBufferView.SizeInBytes = sizeof(vertices);
-    
+
     return true;
 }
 
 bool ModuleD3D12::createRootSignature() {
-   
-    CD3DX12_ROOT_PARAMETER rootParameters[2] = {};
-    CD3DX12_DESCRIPTOR_RANGE srvRange;
-    srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); 
 
+    CD3DX12_ROOT_PARAMETER rootParameters[3] = {};
+    CD3DX12_DESCRIPTOR_RANGE srvRange, sampRange;
+    srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+    sampRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
 
     rootParameters[0].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
-
     rootParameters[1].InitAsDescriptorTable(1, &srvRange, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[2].InitAsDescriptorTable(1, &sampRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
-    CD3DX12_STATIC_SAMPLER_DESC linearSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-    rootSignatureDesc.Init(2, rootParameters, 1, &linearSampler,
-        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    rootSignatureDesc.Init(3, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
     ComPtr<ID3DBlob> signature;
-    ComPtr<ID3DBlob> error;
 
-    if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error))) {
-        if (error) OutputDebugStringA((char*)error->GetBufferPointer());
-        return false;
-    }
+    if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, nullptr))) return false;
 
-    return SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(),
-        signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+    return SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
 }
 
 bool ModuleD3D12::createPSO() {
@@ -342,23 +317,23 @@ bool ModuleD3D12::createPSO() {
         OutputDebugStringA("ERROR: Shaders not found!\n");
         return false;
     }
-    
+
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    psoDesc.InputLayout = { layout, _countof(layout) }; 
+    psoDesc.InputLayout = { layout, _countof(layout) };
     psoDesc.pRootSignature = rootSignature.Get();
     psoDesc.VS = { vs.data(), vs.size() };
     psoDesc.PS = { ps.data(), ps.size() };
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK; 
+    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
     psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     psoDesc.SampleDesc.Count = 1;
-    
+
     return SUCCEEDED(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
 }
 
@@ -369,26 +344,26 @@ void ModuleD3D12::resize(uint32_t width, uint32_t height) {
     if (app->getCamera()) {
         app->getCamera()->SetAspectRatio((float)width / (float)height);
     }
-   
+
     flush();
-    
+
     for (int i = 0; i < BACK_BUFFER_COUNT; ++i) renderTargets[i].Reset();
-    
+
     swapChain->ResizeBuffers(BACK_BUFFER_COUNT, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
     currentFrame = swapChain->GetCurrentBackBufferIndex();
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvH(rtvHeap->GetCPUDescriptorHandleForHeapStart());
-   
+
     for (int i = 0; i < BACK_BUFFER_COUNT; ++i) {
         swapChain->GetBuffer(i, IID_PPV_ARGS(&renderTargets[i]));
         device->CreateRenderTargetView(renderTargets[i].Get(), nullptr, rtvH);
         rtvH.Offset(rtvDescriptorSize);
     }
     depthStencilBuffer.Reset();
-    
+
     D3D12_CLEAR_VALUE dClear = { DXGI_FORMAT_D32_FLOAT, {1.0f, 0} };
     auto hP = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
     auto rD = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, width, height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-    
+
     device->CreateCommittedResource(&hP, D3D12_HEAP_FLAG_NONE, &rD, D3D12_RESOURCE_STATE_DEPTH_WRITE, &dClear, IID_PPV_ARGS(&depthStencilBuffer));
     device->CreateDepthStencilView(depthStencilBuffer.Get(), nullptr, dsvHeap->GetCPUDescriptorHandleForHeapStart());
 }
@@ -402,7 +377,7 @@ ID3D12CommandAllocator* ModuleD3D12::getCommandAllocator() const { return comman
 ID3D12CommandQueue* ModuleD3D12::getDrawCommandQueue() const { return commandQueue.Get(); }
 ID3D12Resource* ModuleD3D12::getBackBuffer() const {
     return renderTargets[currentFrame].Get();
-} 
+}
 
 D3D12_CPU_DESCRIPTOR_HANDLE ModuleD3D12::getRenderTargetDescriptor() const {
     CD3DX12_CPU_DESCRIPTOR_HANDLE h(rtvHeap->GetCPUDescriptorHandleForHeapStart());

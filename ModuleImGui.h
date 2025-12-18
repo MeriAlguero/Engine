@@ -15,10 +15,13 @@ public:
     ModuleImGui();
     ~ModuleImGui() override;
 
+
     bool init() override;
     void preRender() override;
     void render() override;
     void postRender() override;
+    bool showConfigWindow = true;
+    bool showAboutWindow = true;
 
 private:
     std::unique_ptr<ImGuiPass> imguiPass;

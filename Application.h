@@ -45,6 +45,7 @@ public:
     bool                        setPaused(bool p) { paused = p; return paused; }
 
     void* getWindow() const { return window; }
+    void requestQuit() { exit = true; } 
 
 private:
     enum { MAX_FPS_TICKS = 30 };
@@ -58,6 +59,7 @@ private:
     uint64_t  tickSum = 0;
     uint64_t  elapsedMilis = 0;
     bool      paused = false;
+    bool exit = false;
 
     void* window = nullptr;
 
