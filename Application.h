@@ -3,6 +3,7 @@
 #include "Globals.h"
 #include "Module.h"
 #include "ModuleResource.h"
+#include "ModuleShaderDescriptors.h"
 
 #include <array>
 #include <vector>
@@ -11,6 +12,7 @@
 class Module;
 class ModuleD3D12;
 class ModuleImGui;
+class ModuleShaderDescriptors;
 
 class Application
 {
@@ -27,6 +29,7 @@ public:
     ModuleD3D12* getD3D12() const;
     ModuleResource* getResources() const;
     ModuleImGui* getImGui() const { return m_imgui; }
+    ModuleShaderDescriptors* getShaderDescriptors() const { return shaderDescriptors; }
     
     float                       getFPS() const { return 1000.0f * float(MAX_FPS_TICKS) / tickSum; }
     float                       getAvgElapsedMs() const { return tickSum / float(MAX_FPS_TICKS); }
@@ -36,6 +39,7 @@ public:
     bool                        setPaused(bool p) { paused = p; return paused; }
 
     void* getWindow() const { return window; }
+
 private:
     enum { MAX_FPS_TICKS = 30 };
     typedef std::array<uint64_t, MAX_FPS_TICKS> TickList;
@@ -53,6 +57,7 @@ private:
 
     ModuleResource* m_resources = nullptr;
     ModuleImGui* m_imgui = nullptr;
+    ModuleShaderDescriptors* shaderDescriptors = nullptr;
 };
 
 extern Application* app;

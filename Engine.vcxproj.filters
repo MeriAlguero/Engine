@@ -3,6 +3,8 @@
   <ItemGroup>
     <FxCompile Include="BasicTransformVS.hlsl" />
     <FxCompile Include="SolidColorPS.hlsl" />
+    <FxCompile Include="SamplerTestVS.hlsl" />
+    <FxCompile Include="SamplerTestPS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="3rdParty\imgui-docking\backends\imgui_impl_dx12.cpp" />
@@ -26,6 +28,7 @@
     <ClCompile Include="ModuleImGui.cpp" />
     <ClCompile Include="ModuleD3D12.cpp" />
     <ClCompile Include="ModuleResource.cpp" />
+    <ClCompile Include="ModuleShaderDescriptors.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3rdParty\imgui-1.89.8\backends\imgui_impl_win32.h" />
@@ -54,6 +57,7 @@
     <ClInclude Include="ModuleImGui.h" />
     <ClInclude Include="ModuleD3D12.h" />
     <ClInclude Include="ModuleResource.h" />
+    <ClInclude Include="ModuleShaderDescriptors.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Engine.rc" />

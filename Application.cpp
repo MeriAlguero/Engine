@@ -8,8 +8,11 @@
 
 Application::Application(int argc, wchar_t** argv, void* hWnd)
 {
+    shaderDescriptors = new ModuleShaderDescriptors();
     modules.push_back(new ModuleInput((HWND)hWnd));
     modules.push_back(new ModuleD3D12((HWND)hWnd));
+    modules.push_back(shaderDescriptors);
+
     m_imgui = new ModuleImGui();
     modules.push_back(m_imgui);
     modules.push_back(m_resources = new ModuleResource());

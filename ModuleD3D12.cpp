@@ -153,6 +153,40 @@ bool ModuleD3D12::init()
     ok_triangle = ok_triangle && createRootSignature();
     ok_triangle = ok_triangle && createPSO();
 
+    if (ok && ok_triangle)
+    {
+        commandAllocator->Reset();
+        commandList->Reset(commandAllocator.Get(), nullptr);
+
+        textureDog = app->getResources()->createTextureFromFile(L"../Game/Assets/Textures/dog.dds");
+
+        if (textureDog)
+        {
+            dogDescriptor = app->getShaderDescriptors()->allocTable(1);
+            dogDescriptor.createTextureSRV(textureDog.Get());
+
+            commandList->Close();
+            ID3D12CommandList* lists[] = { commandList.Get() };
+            commandQueue->ExecuteCommandLists(1, lists);
+
+            flush();
+        }
+        else
+        {
+            OutputDebugStringA("ERROR: No se pudo cargar dog.dds\n");
+            commandList->Close();
+        }
+
+        commandList->Close();
+        ID3D12CommandList* lists[] = { commandList.Get() };
+        commandQueue->ExecuteCommandLists(1, lists);
+
+        fenceValue++;
+        commandQueue->Signal(fence.Get(), fenceValue);
+        fence->SetEventOnCompletion(fenceValue, fenceEvent);
+        WaitForSingleObject(fenceEvent, INFINITE);
+    }
+
     return ok && ok_triangle;
 }
 
@@ -161,8 +195,7 @@ void ModuleD3D12::render()
     using namespace DirectX::SimpleMath;
 
     if (!commandList || !commandAllocator || !pso || !debugDraw) return;
-
-    commandList->Reset(commandAllocator.Get(), pso.Get());
+    commandList->SetPipelineState(pso.Get()); 
 
     float w = (float)windowWidth;
     float h = (float)windowHeight;
@@ -193,7 +226,19 @@ void ModuleD3D12::render()
     commandList->SetGraphicsRoot32BitConstants(0, 16, &mvp, 0);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-    commandList->DrawInstanced(3, 1, 0, 0);
+   
+    auto shaderDescriptors = app->getShaderDescriptors();
+
+    if (shaderDescriptors != nullptr && textureDog != nullptr) {
+        ID3D12DescriptorHeap* heap = shaderDescriptors->getHeap();
+        if (heap != nullptr) {
+            ID3D12DescriptorHeap* heaps[] = { heap };
+            commandList->SetDescriptorHeaps(1, heaps);
+            commandList->SetGraphicsRootDescriptorTable(1, dogDescriptor.getGPUHandle());
+        }
+    }
+    
+    commandList->DrawInstanced(vertexCount, 1, 0, 0);
 
     // --- DEBUG DRAW ---
     dd::xzSquareGrid(-10.0f, 10.0f, 0.0f, 1.0f, dd::colors::LightGray);
@@ -204,12 +249,16 @@ void ModuleD3D12::render()
 }
 
 void ModuleD3D12::preRender() {
-    if (fenceValue != 0) {
-        fence->SetEventOnCompletion(fenceValue, fenceEvent);
-        WaitForSingleObject(fenceEvent, INFINITE);
-    }
-    currentFrame = swapChain->GetCurrentBackBufferIndex(); 
+    flush();
+
+    currentFrame = swapChain->GetCurrentBackBufferIndex();
     commandAllocator->Reset();
+
+    HRESULT hr = commandList->Reset(commandAllocator.Get(), pso.Get());
+
+    if (FAILED(hr)) {
+        OutputDebugStringA("ERROR: No s'ha pogut resetejar la Command List\n");
+    }
 }
 
 void ModuleD3D12::postRender() {
@@ -234,6 +283,7 @@ void ModuleD3D12::postRender() {
     fenceValue++;
     commandQueue->Signal(fence.Get(), fenceValue);
 }
+
 bool ModuleD3D12::flush() {
     fenceValue++;
     commandQueue->Signal(fence.Get(), fenceValue);
@@ -272,17 +322,26 @@ bool ModuleD3D12::createDevice(bool useWarp) {
     return SUCCEEDED(D3D12CreateDevice(adp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device)));
 }
 
+struct Vertex {
+    float x, y, z;
+    float u, v;
+};
+
 bool ModuleD3D12::createVertexBuffer() {
     
-    struct Vertex { float x, y, z; };
-    static Vertex vertices[3] =
-    {
-        {  0.0f,  1.0f, 0.0f }, 
-        {  1.0f, -1.0f, 0.0f },
-        { -1.0f, -1.0f, 0.0f }
+    static Vertex vertices[6] = {
+
+        { -0.5f,  0.5f, 0.0f,  0.0f, 0.0f }, // Top-left
+        {  0.5f, -0.5f, 0.0f,  1.0f, 1.0f }, // Bottom-right
+        { -0.5f, -0.5f, 0.0f,  0.0f, 1.0f }, // Bottom-left
+
+        { -0.5f,  0.5f, 0.0f,  0.0f, 0.0f }, // Top-left
+        {  0.5f,  0.5f, 0.0f,  1.0f, 0.0f }, // Top-right
+        {  0.5f, -0.5f, 0.0f,  1.0f, 1.0f }  // Bottom-right
     };
-    vertexBuffer = app->getResources()->createDefaultBuffer(vertices, sizeof(vertices), "TriangleVB");
-    vertexCount = 3;
+
+    vertexBuffer = app->getResources()->createDefaultBuffer(vertices, sizeof(vertices), "QuadVB");
+    vertexCount = 6;
    
     if (!vertexBuffer) return false;
     vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
@@ -294,21 +353,41 @@ bool ModuleD3D12::createVertexBuffer() {
 
 bool ModuleD3D12::createRootSignature() {
    
-    CD3DX12_ROOT_PARAMETER param;
-    param.InitAsConstants(16, 0);
-    CD3DX12_ROOT_SIGNATURE_DESC desc(1, &param, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-    ComPtr<ID3DBlob> blob;
-    
-    if (FAILED(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr))) return false;
-    
-    return SUCCEEDED(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+    CD3DX12_ROOT_PARAMETER rootParameters[2] = {};
+    CD3DX12_DESCRIPTOR_RANGE srvRange;
+    srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); 
+
+
+    rootParameters[0].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+
+    rootParameters[1].InitAsDescriptorTable(1, &srvRange, D3D12_SHADER_VISIBILITY_PIXEL);
+
+    CD3DX12_STATIC_SAMPLER_DESC linearSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+    CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+    rootSignatureDesc.Init(2, rootParameters, 1, &linearSampler, // 2 parámetros, 1 sampler estático
+        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+
+    if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error))) {
+        if (error) OutputDebugStringA((char*)error->GetBufferPointer());
+        return false;
+    }
+
+    return SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(),
+        signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
 }
 
 bool ModuleD3D12::createPSO() {
-    D3D12_INPUT_ELEMENT_DESC layout[] = { {"MY_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0} };
-    
-    auto vs = DX::ReadData(L"BasicTransformVS.cso");
-    auto ps = DX::ReadData(L"SolidColorPS.cso");
+    D3D12_INPUT_ELEMENT_DESC layout[] = {
+     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+     { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+    };
+
+    auto vs = DX::ReadData(L"SamplerTestVS.cso");
+    auto ps = DX::ReadData(L"SamplerTestPS.cso");
 
     if (vs.empty() || ps.empty()) {
         OutputDebugStringA("ERROR: Shaders not found!\n");
@@ -316,19 +395,19 @@ bool ModuleD3D12::createPSO() {
     }
     
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.InputLayout = { layout, 1 };
+    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.InputLayout = { layout, _countof(layout) }; 
     psoDesc.pRootSignature = rootSignature.Get();
     psoDesc.VS = { vs.data(), vs.size() };
     psoDesc.PS = { ps.data(), ps.size() };
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK; 
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
     psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     psoDesc.SampleDesc.Count = 1;
     
     return SUCCEEDED(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
@@ -367,7 +446,9 @@ UINT ModuleD3D12::getLastCompletedFrame() const { return (UINT)fence->GetComplet
 ID3D12GraphicsCommandList* ModuleD3D12::getCommandList() const { return commandList.Get(); }
 ID3D12CommandAllocator* ModuleD3D12::getCommandAllocator() const { return commandAllocator.Get(); }
 ID3D12CommandQueue* ModuleD3D12::getDrawCommandQueue() const { return commandQueue.Get(); }
-ID3D12Resource* ModuleD3D12::getBackBuffer() const { return renderTargets[currentFrame].Get(); }
+ID3D12Resource* ModuleD3D12::getBackBuffer() const {
+    return renderTargets[currentFrame].Get();
+} 
 
 D3D12_CPU_DESCRIPTOR_HANDLE ModuleD3D12::getRenderTargetDescriptor() const {
     CD3DX12_CPU_DESCRIPTOR_HANDLE h(rtvHeap->GetCPUDescriptorHandleForHeapStart());

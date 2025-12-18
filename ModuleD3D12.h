@@ -2,6 +2,7 @@
 
 #include "Module.h"
 #include "DebugDrawPass.h"
+#include "ModuleShaderDescriptors.h"
 #include <wrl/client.h>
 #include <dxgi1_6.h>
 #include <cstdint>
@@ -46,12 +47,18 @@ private:
     ComPtr<ID3D12RootSignature> rootSignature;
     ComPtr<ID3D12PipelineState> pso;
     uint32_t vertexCount = 0; 
+
+    ComPtr<ID3D12Resource> textureDog;
+    DescriptorTable dogDescriptor;
   
     ComPtr<ID3D12Resource> depthStencilBuffer;
     ComPtr<ID3D12DescriptorHeap> dsvHeap;
     UINT dsvDescriptorSize = 0;
-
    
+    ComPtr<ID3D12DescriptorHeap> srvHeap; 
+    ComPtr<ID3D12DescriptorHeap> samplerHeap;
+    UINT srvDescriptorSize = 0;
+    UINT samplerDescriptorSize = 0;
 
 public:
 
@@ -82,7 +89,8 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getRenderTargetDescriptor() const; 
     ID3D12CommandQueue* getDrawCommandQueue() const; //cola
 
-  
+
+
 
     
 private:
