@@ -11,11 +11,8 @@ public:
 
     // Load model from glTF file
     void Load(const char* assetFileName);
-
     // Render the entire model
     void Render(ID3D12GraphicsCommandList* commandList) const;
-
-   /* // Getters
-    const std::vector<Mesh>& GetMeshes() const { return meshes; }
-    const std::vector<Material>& GetMaterials() const { return materials; }*/
+    
+   
 };
