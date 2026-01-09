@@ -150,7 +150,7 @@ bool ModuleRenderer::createRootSignature() {
     rootParameters[0].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
 
     // Material constant buffer
-    rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[1].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Texture SRV descriptor table
     rootParameters[2].InitAsDescriptorTable(1, &srvTable, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -234,7 +234,12 @@ void ModuleRenderer::renderModel()
     auto camera = app->getCamera();
     auto commandList = d3d12->getCommandList();
 
-    if (!commandList || !pipelineState || !camera) return;
+    if (!commandList || !pipelineState || !camera) {
+        LOG("renderModel: Missing required components!");
+        return;
+    }
+
+    LOG("renderModel: Starting to render...");
 
     // Configure viewport and scissor
     float w = (float)d3d12->getWindowWidth();
@@ -248,20 +253,39 @@ void ModuleRenderer::renderModel()
     commandList->SetPipelineState(pipelineState.Get());
     commandList->SetGraphicsRootSignature(rootSignature.Get());
 
-    // Pass MVP matrix
-    DirectX::SimpleMath::Matrix mvp = DirectX::SimpleMath::Matrix::Identity *
-        camera->getViewMatrix() *
-        camera->getProjectionMatrix();
-    mvp = mvp.Transpose();
+    // Get matrices from camera (make sure these methods exist)
+    DirectX::SimpleMath::Matrix view = camera->getViewMatrix();
+    DirectX::SimpleMath::Matrix proj = camera->getProjectionMatrix();
+
+    LOG("renderModel: Got camera matrices");
+
+
+    DirectX::SimpleMath::Matrix modelMatrix = DirectX::SimpleMath::Matrix::Identity;
+
+ 
+    float scale = 10.0f; 
+    modelMatrix = DirectX::SimpleMath::Matrix::CreateScale(scale);
+
+    // Also try rotating if it's facing wrong direction
+    // modelMatrix *= DirectX::SimpleMath::Matrix::CreateRotationY(3.14159f); // 180 degrees
+
+    // Position it in front of camera
+    modelMatrix *= DirectX::SimpleMath::Matrix::CreateTranslation(0.0f, 0.0f, 0.0f);
+
+    // Create MVP matrix (Model * View * Projection)
+    DirectX::SimpleMath::Matrix mvp = modelMatrix * view * proj;
+    mvp = mvp.Transpose();  // HLSL expects column-major
+
+    LOG("renderModel: Setting MVP matrix (scale = %f)", scale);
     commandList->SetGraphicsRoot32BitConstants(0, 16, &mvp, 0);
 
-    //Pass material from the material to the shader
+    // Pass material
     if (materialConstantBuffer && materialConstantBufferMapped) {
         struct MaterialData {
             DirectX::XMFLOAT4 baseColor;
             float metallic;
             float roughness;
-            float padding[2]; // Relleno para alineación 16 bytes
+            float padding[2];
         };
         MaterialData material;
 
@@ -269,25 +293,30 @@ void ModuleRenderer::renderModel()
             material.baseColor = model.materials[0].baseColor;
             material.metallic = 0.5f;
             material.roughness = 0.5f;
+            LOG("renderModel: Using material from model");
         }
         else {
-            material.baseColor = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+            // BRIGHT YELLOW to make it visible
+            material.baseColor = DirectX::XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f);
             material.metallic = 0.5f;
             material.roughness = 0.5f;
+            LOG("renderModel: Using default yellow material");
         }
         memcpy(materialConstantBufferMapped, &material, sizeof(MaterialData));
 
-        // ¡¡¡ENLAZAR EL BUFFER CONSTANTE AL REGISTRO 1!!!
         commandList->SetGraphicsRootConstantBufferView(
             1,
             materialConstantBuffer->GetGPUVirtualAddress()
         );
+        LOG("renderModel: Material constant buffer bound");
     }
 
-
     // Render the model
+    LOG("renderModel: Calling model.Render()...");
     model.Render(commandList);
+    LOG("renderModel: Finished rendering");
 }
+
 
 void ModuleRenderer::renderDebugDraw() {
     if (!debugDraw) return;

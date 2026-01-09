@@ -135,13 +135,33 @@ void ModuleD3D12::preRender() {
 
     currentFrame = swapChain->GetCurrentBackBufferIndex();
    
-    if (commandList) {
-        commandList->Close();
+    if (m_commandListOpen) {
+        LOG("WARNING: Command list was still open in preRender! Forcing close.");
+        HRESULT hr = commandList->Close();
+        if (SUCCEEDED(hr)) {
+            m_commandListOpen = false;
+        }
+    } 
+
+    // Reset command allocator (now safe since command list is closed)
+    HRESULT hr = commandAllocator->Reset();
+    if (FAILED(hr)) {
+        LOG("Failed to reset command allocator: 0x%08X", hr);
+        return;
     }
 
-    commandAllocator->Reset();
-    // Cambiar nullptr en lugar de pso.Get() ya que pso ya no existe aquí
-    commandList->Reset(commandAllocator.Get(), nullptr);
+    // Reset command list WITHOUT pipeline state (nullptr)
+    hr = commandList->Reset(commandAllocator.Get(), nullptr);
+    if (FAILED(hr)) {
+        LOG("Failed to reset command list: 0x%08X", hr);
+        commandList->Close();
+        commandAllocator->Reset();
+        hr = commandList->Reset(commandAllocator.Get(), nullptr);
+        if (FAILED(hr)) {
+            LOG("Failed to reset command list even after closing: 0x%08X", hr);
+            return;
+        }
+    }
 
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -159,9 +179,25 @@ void ModuleD3D12::preRender() {
 void ModuleD3D12::postRender() {
     if (!commandList || !commandQueue) return;
 
+    if (m_commandListOpen) {
+        HRESULT hr = commandList->Close();
+        if (FAILED(hr)) {
+            LOG("postRender: Failed to close command list: 0x%08X", hr);
+        }
+        else {
+            m_commandListOpen = false;
+        }
+    }
+
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     commandList->ResourceBarrier(1, &barrier);
+
+    if (m_commandListOpen) {
+        commandList->Close();
+        m_commandListOpen = false;
+    }
+
 
     commandList->Close();
     ID3D12CommandList* lists[] = { commandList.Get() };

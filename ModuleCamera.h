@@ -15,6 +15,7 @@ public:
     const Matrix& GetProjectionMatrix() const;
     const Matrix& GetViewMatrix() const { return view; }
 
+    Vector3 getPosition() const { return position; }
     const Matrix& getViewMatrix() const { return GetViewMatrix(); }
     const Matrix& getProjectionMatrix() const { return GetProjectionMatrix(); }
 

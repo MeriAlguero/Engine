@@ -7,6 +7,7 @@
 class ModuleD3D12 : public Module
 {
 private:
+    bool m_commandListOpen = false;
     HWND hWnd = NULL;
     uint32_t windowWidth = 0;
     uint32_t windowHeight = 0;
@@ -37,6 +38,7 @@ private:
     HANDLE fenceEvent = nullptr;
 
 public:
+    
     ModuleD3D12(HWND hWnd);
     ~ModuleD3D12();
 
@@ -48,6 +50,7 @@ public:
     void postRender() override;
     void resize(uint32_t width, uint32_t height);
     bool flush();
+    bool isCommandListOpen() const { return m_commandListOpen; }
 
     // Getters para otros módulos
     ID3D12Device5* getDevice() const;
