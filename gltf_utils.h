@@ -6,13 +6,10 @@
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_NO_STB_IMAGE
 #define TINYGLTF_NO_EXTERNAL_IMAGE
-#define TINYGLTF_IMPLEMENTATION 
 
 #pragma warning(push)
 #pragma warning(disable : 4018)  // Signed/unsigned mismatch
 #pragma warning(disable : 4267)  // Size_t to int conversion
-//#pragma warning(disable : 4100) // Unreferenced parameter
-//#pragma warning(disable : 4189) // Local variable initialized but not referenced
 
 #include "tiny_gltf.h"
 

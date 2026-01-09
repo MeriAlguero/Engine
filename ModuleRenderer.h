@@ -36,6 +36,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
 
+    Microsoft::WRL::ComPtr<ID3D12Resource> materialConstantBuffer;
+    void* materialConstantBufferMapped = nullptr;
+
     uint32_t vertexCount = 0;
     Model model;
     bool showGrid = true;

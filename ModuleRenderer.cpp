@@ -16,6 +16,11 @@ ModuleRenderer::~ModuleRenderer() {
         delete debugDraw;
         debugDraw = nullptr;
     }
+
+    if (materialConstantBuffer && materialConstantBufferMapped) {
+        materialConstantBuffer->Unmap(0, nullptr);
+        materialConstantBufferMapped = nullptr;
+    }
 }
 
 bool ModuleRenderer::init() {
@@ -37,6 +42,28 @@ bool ModuleRenderer::init() {
 
     // Create pipeline state
     if (!createPipelineState()) return false;
+
+    CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+    CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(64); 
+
+    if (FAILED(device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&materialConstantBuffer)))) {
+        LOG("Failed to create material constant buffer");
+        return false;
+    }
+
+    // Maps buffer to write data
+    if (FAILED(materialConstantBuffer->Map(0, nullptr, &materialConstantBufferMapped))) {
+        LOG("Failed to map material constant buffer");
+        return false;
+    }
+
+    LOG("Material constant buffer created successfully");
 
     modelLoaded = false;
 
@@ -120,16 +147,16 @@ bool ModuleRenderer::createRootSignature() {
     CD3DX12_ROOT_PARAMETER rootParameters[4] = {};
 
   
-    rootParameters[0].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX); 
+    rootParameters[0].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
 
     // Material constant buffer
-    rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_PIXEL); 
+    rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Texture SRV descriptor table
-    rootParameters[2].InitAsDescriptorTable(1, &srvTable, D3D12_SHADER_VISIBILITY_PIXEL); 
+    rootParameters[2].InitAsDescriptorTable(1, &srvTable, D3D12_SHADER_VISIBILITY_PIXEL);
    
     // Sampler descriptor table
-    rootParameters[3].InitAsDescriptorTable(1, &samplerTable, D3D12_SHADER_VISIBILITY_PIXEL); 
+    rootParameters[3].InitAsDescriptorTable(1, &samplerTable, D3D12_SHADER_VISIBILITY_PIXEL);
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
     rootSignatureDesc.Init(4, rootParameters, 0, nullptr,
@@ -221,14 +248,42 @@ void ModuleRenderer::renderModel()
     commandList->SetPipelineState(pipelineState.Get());
     commandList->SetGraphicsRootSignature(rootSignature.Get());
 
-    // TODO: Update root signature to include material CBV and texture
-
     // Pass MVP matrix
     DirectX::SimpleMath::Matrix mvp = DirectX::SimpleMath::Matrix::Identity *
         camera->getViewMatrix() *
         camera->getProjectionMatrix();
     mvp = mvp.Transpose();
     commandList->SetGraphicsRoot32BitConstants(0, 16, &mvp, 0);
+
+    //Pass material from the material to the shader
+    if (materialConstantBuffer && materialConstantBufferMapped) {
+        struct MaterialData {
+            DirectX::XMFLOAT4 baseColor;
+            float metallic;
+            float roughness;
+            float padding[2]; // Relleno para alineación 16 bytes
+        };
+        MaterialData material;
+
+        if (!model.materials.empty()) {
+            material.baseColor = model.materials[0].baseColor;
+            material.metallic = 0.5f;
+            material.roughness = 0.5f;
+        }
+        else {
+            material.baseColor = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+            material.metallic = 0.5f;
+            material.roughness = 0.5f;
+        }
+        memcpy(materialConstantBufferMapped, &material, sizeof(MaterialData));
+
+        // ¡¡¡ENLAZAR EL BUFFER CONSTANTE AL REGISTRO 1!!!
+        commandList->SetGraphicsRootConstantBufferView(
+            1,
+            materialConstantBuffer->GetGPUVirtualAddress()
+        );
+    }
+
 
     // Render the model
     model.Render(commandList);

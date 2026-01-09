@@ -134,6 +134,10 @@ void ModuleD3D12::preRender() {
     flush();
 
     currentFrame = swapChain->GetCurrentBackBufferIndex();
+   
+    if (commandList) {
+        commandList->Close();
+    }
 
     commandAllocator->Reset();
     // Cambiar nullptr en lugar de pso.Get() ya que pso ya no existe aquí

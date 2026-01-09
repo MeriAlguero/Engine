@@ -8,6 +8,9 @@
 #include "ModuleRenderer.h"
 
 
+#define TINYGLTF_IMPLEMENTATION
+#include "tiny_gltf.h"
+
 Application::Application(int argc, wchar_t** argv, void* hWnd)
 {
     this->window = hWnd;
