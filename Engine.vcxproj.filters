@@ -5,6 +5,10 @@
     <FxCompile Include="SolidColorPS.hlsl" />
     <FxCompile Include="SamplerTestVS.hlsl" />
     <FxCompile Include="SamplerTestPS.hlsl" />
+    <FxCompile Include="ModelVS.hlsl" />
+    <FxCompile Include="ModelPS.hlsl" />
+    <FxCompile Include="DefaultVS.hlsl" />
+    <FxCompile Include="DefaultPS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="3rdParty\imgui-docking\backends\imgui_impl_dx12.cpp" />
@@ -30,6 +34,10 @@
     <ClCompile Include="ModuleResource.cpp" />
     <ClCompile Include="ModuleShaderDescriptors.cpp" />
     <ClCompile Include="ModuleCamera.cpp" />
+    <ClCompile Include="ModuleRenderer.cpp" />
+    <ClCompile Include="Model.cpp" />
+    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Material.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3rdParty\imgui-1.89.8\backends\imgui_impl_win32.h" />
@@ -60,6 +68,11 @@
     <ClInclude Include="ModuleResource.h" />
     <ClInclude Include="ModuleShaderDescriptors.h" />
     <ClInclude Include="ModuleCamera.h" />
+    <ClInclude Include="ModuleRenderer.h" />
+    <ClInclude Include="gltf_utils.h" />
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Material.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Engine.rc" />

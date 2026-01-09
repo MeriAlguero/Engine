@@ -5,6 +5,7 @@
 #include "ModuleResource.h"
 #include "ModuleImGui.h"
 #include "ModuleCamera.h"
+#include "ModuleRenderer.h"
 
 
 Application::Application(int argc, wchar_t** argv, void* hWnd)
@@ -17,12 +18,14 @@ Application::Application(int argc, wchar_t** argv, void* hWnd)
     input = new ModuleInput((HWND)hWnd);
     m_imgui = new ModuleImGui();
     m_resources = new ModuleResource();
+    renderer = new ModuleRenderer();
 
     modules.push_back(d3d12);
     modules.push_back(shaderDescriptors);
     modules.push_back(input);
     modules.push_back(camera);
     modules.push_back(m_resources);
+    modules.push_back(renderer);
     modules.push_back(m_imgui);
    
 }

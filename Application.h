@@ -16,6 +16,7 @@ class ModuleImGui;
 class ModuleShaderDescriptors;
 class ModuleCamera;
 class ModuleInput;
+class ModuleRenderer;
 
 class Application
 {
@@ -30,6 +31,7 @@ public:
     
     ModuleD3D12* getD3D12() const;
     ModuleResource* getResources() const;
+    ModuleRenderer* getRenderer() const { return renderer; }
     ModuleImGui* getImGui() const { return m_imgui; }
     ModuleShaderDescriptors* getShaderDescriptors() const { return shaderDescriptors; }
     ModuleD3D12* getD3D12() { return d3d12; }
@@ -64,6 +66,7 @@ private:
     void* window = nullptr;
 
     ModuleResource* m_resources = nullptr;
+    ModuleRenderer* renderer = nullptr;
     ModuleImGui* m_imgui = nullptr;
     ModuleShaderDescriptors* shaderDescriptors = nullptr;
     ModuleCamera* camera = nullptr;

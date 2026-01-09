@@ -2,6 +2,7 @@
 #include "Application.h"
 #include "ModuleD3D12.h"
 #include "ModuleImGui.h"
+#include "ModuleRenderer.h"
 
 #include "imgui.h"
 #include "3rdParty/imgui-docking/backends/imgui_impl_win32.h"
@@ -111,6 +112,7 @@ void ModuleImGui::drawConfigurationWindow()
     if (ImGui::Begin("Configuration", &showConfigWindow))
     {
         ModuleD3D12* d3d12 = app->getD3D12();
+        ModuleRenderer* renderer = app->getRenderer();
 
         float fps = ImGui::GetIO().Framerate;
         float ms = 1000.0f / fps;
@@ -127,13 +129,13 @@ void ModuleImGui::drawConfigurationWindow()
 
         ImGui::Separator();
         ImGui::Text("Debug Gizmos");
-        bool grid = d3d12->IsShowGrid();
-        bool axis = d3d12->IsShowAxis();
+        bool grid = renderer->isGridVisible();
+        bool axis = renderer->isAxisVisible();
         if (ImGui::Checkbox("Show Grid", &grid)) {
-            d3d12->SetShowGrid(grid);
+            renderer->setGridVisible(grid);
         }
         if (ImGui::Checkbox("Show Axis", &axis)) {
-            d3d12->SetShowAxis(axis);
+            renderer->setAxisVisible(axis);
         }
 
         ImGui::Separator();

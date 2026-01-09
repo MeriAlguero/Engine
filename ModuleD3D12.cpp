@@ -11,9 +11,11 @@
 ModuleD3D12::ModuleD3D12(HWND wnd) : hWnd(wnd) {}
 
 ModuleD3D12::~ModuleD3D12() {
-    if (debugDraw) {
-        delete debugDraw;
-        debugDraw = nullptr;
+    
+    // Limpiar fence event
+    if (fenceEvent) {
+        CloseHandle(fenceEvent);
+        fenceEvent = nullptr;
     }
 }
 
@@ -25,7 +27,6 @@ bool ModuleD3D12::init()
 
     bool ok = createFactory();
     ok = ok && createDevice(false);
-    bool ok_triangle = false;
 
     if (ok)
     {
@@ -33,10 +34,6 @@ bool ModuleD3D12::init()
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
         ok = SUCCEEDED(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
-
-        if (ok) {
-            debugDraw = new DebugDrawPass(device.Get(), commandQueue.Get());
-        }
 
         if (ok)
             ok = SUCCEEDED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
@@ -56,6 +53,7 @@ bool ModuleD3D12::init()
         ok = SUCCEEDED(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
         if (ok) rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     }
+
     RECT clientRect = {};
     GetClientRect(hWnd, &clientRect);
     this->windowWidth = (clientRect.right - clientRect.left > 0) ? clientRect.right - clientRect.left : 1280;
@@ -116,66 +114,21 @@ bool ModuleD3D12::init()
 
     if (ok)
     {
+        // Solo inicializar command list básico, sin crear geometría
         commandAllocator->Reset();
         commandList->Reset(commandAllocator.Get(), nullptr);
-
-        ok_triangle = createVertexBuffer();
-        ok_triangle = ok_triangle && createRootSignature();
-        ok_triangle = ok_triangle && createPSO();
-
-        if (ok_triangle)
-        {
-            /* textureDog = app->getResources()->createTextureFromFile(L"../Game/Assets/Textures/dog.dds");
-
-                 if (textureDog)
-                 {
-                     dogDescriptor = app->getShaderDescriptors()->allocTable(1);
-                     dogDescriptor.createTextureSRV(textureDog.Get());
-                 }*/
-        }
-
         commandList->Close();
+
         ID3D12CommandList* lists[] = { commandList.Get() };
         commandQueue->ExecuteCommandLists(1, lists);
 
         flush();
     }
 
-    return ok && ok_triangle;
+    return ok; 
 }
 
-void ModuleD3D12::render()
-{
-    if (!commandList || !pso) return;
 
-    float w = (float)windowWidth;
-    float h = (float)windowHeight;
-    D3D12_VIEWPORT vp{ 0.0f, 0.0f, w, h, 0.0f, 1.0f };
-    D3D12_RECT sr{ 0, 0, (LONG)w, (LONG)h };
-    commandList->RSSetViewports(1, &vp);
-    commandList->RSSetScissorRects(1, &sr);
-
-    commandList->SetPipelineState(pso.Get());
-    commandList->SetGraphicsRootSignature(rootSignature.Get());
-
-    auto camera = app->getCamera();
-    DirectX::SimpleMath::Matrix mvp = (DirectX::SimpleMath::Matrix::Identity * camera->getViewMatrix() * camera->getProjectionMatrix()).Transpose();
-    commandList->SetGraphicsRoot32BitConstants(0, 16, &mvp, 0);
-
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-    commandList->DrawInstanced(6, 1, 0, 0);
-
-    if (showGrid) {
-        dd::xzSquareGrid(-10.0f, 10.0f, 0.0f, 1.0f, dd::colors::LightGray);
-    }
-    if (showAxis) {
-        DirectX::SimpleMath::Matrix id = DirectX::SimpleMath::Matrix::Identity;
-        dd::axisTriad(&id._11, 0.1f, 1.5f);
-    }
-
-    debugDraw->record(commandList.Get(), (uint32_t)windowWidth, (uint32_t)windowHeight, camera->getViewMatrix(), camera->getProjectionMatrix()); 
-}
 
 void ModuleD3D12::preRender() {
     flush();
@@ -183,7 +136,8 @@ void ModuleD3D12::preRender() {
     currentFrame = swapChain->GetCurrentBackBufferIndex();
 
     commandAllocator->Reset();
-    commandList->Reset(commandAllocator.Get(), pso.Get());
+    // Cambiar nullptr en lugar de pso.Get() ya que pso ya no existe aquí
+    commandList->Reset(commandAllocator.Get(), nullptr);
 
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -252,91 +206,6 @@ bool ModuleD3D12::createDevice(bool useWarp) {
     return SUCCEEDED(D3D12CreateDevice(adp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device)));
 }
 
-
-
-bool ModuleD3D12::createVertexBuffer() {
-
-    struct Vertex {
-        Vector3 position;
-        Vector2 uv;
-    };
-
-    static Vertex vertices[6] = {
-
-        { Vector3(-1.0f, -1.0f, 0.0f), Vector2(-0.2f, 1.2f) },
-        { Vector3(-1.0f, 1.0f, 0.0f), Vector2(-0.2f, -0.2f) },
-        { Vector3(1.0f, 1.0f, 0.0f), Vector2(1.2f, -0.2f) },
-        { Vector3(-1.0f, -1.0f, 0.0f), Vector2(-0.2f, 1.2f) },
-        { Vector3(1.0f, 1.0f, 0.0f), Vector2(1.2f, -0.2f) },
-        { Vector3(1.0f, -1.0f, 0.0f), Vector2(1.2f, 1.2f) }
-    };
-
-    vertexBuffer = app->getResources()->createDefaultBuffer(vertices, sizeof(vertices), "QuadVB");
-    vertexCount = 6;
-
-    if (!vertexBuffer) return false;
-    vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-    vertexBufferView.StrideInBytes = sizeof(Vertex);
-    vertexBufferView.SizeInBytes = sizeof(vertices);
-
-    return true;
-}
-
-bool ModuleD3D12::createRootSignature() {
-
-    CD3DX12_ROOT_PARAMETER rootParameters[3] = {};
-    CD3DX12_DESCRIPTOR_RANGE srvRange, sampRange;
-    srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-    sampRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
-
-    rootParameters[0].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
-    rootParameters[1].InitAsDescriptorTable(1, &srvRange, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[2].InitAsDescriptorTable(1, &sampRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-
-    CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-    rootSignatureDesc.Init(3, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-    ComPtr<ID3DBlob> signature;
-
-    if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, nullptr))) return false;
-
-    return SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
-}
-
-bool ModuleD3D12::createPSO() {
-    D3D12_INPUT_ELEMENT_DESC layout[] = {
-     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-     { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-    };
-
-    auto vs = DX::ReadData(L"SamplerTestVS.cso");
-    auto ps = DX::ReadData(L"SamplerTestPS.cso");
-
-    if (vs.empty() || ps.empty()) {
-        OutputDebugStringA("ERROR: Shaders not found!\n");
-        return false;
-    }
-
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    psoDesc.InputLayout = { layout, _countof(layout) };
-    psoDesc.pRootSignature = rootSignature.Get();
-    psoDesc.VS = { vs.data(), vs.size() };
-    psoDesc.PS = { ps.data(), ps.size() };
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.SampleDesc.Count = 1;
-
-    return SUCCEEDED(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
-}
-
 void ModuleD3D12::resize(uint32_t width, uint32_t height) {
     if (!device || !swapChain) return;
     windowWidth = width; windowHeight = height;
@@ -367,7 +236,6 @@ void ModuleD3D12::resize(uint32_t width, uint32_t height) {
     device->CreateCommittedResource(&hP, D3D12_HEAP_FLAG_NONE, &rD, D3D12_RESOURCE_STATE_DEPTH_WRITE, &dClear, IID_PPV_ARGS(&depthStencilBuffer));
     device->CreateDepthStencilView(depthStencilBuffer.Get(), nullptr, dsvHeap->GetCPUDescriptorHandleForHeapStart());
 }
-
 
 ID3D12Device5* ModuleD3D12::getDevice() const { return device.Get(); }
 uint32_t ModuleD3D12::getCurrentFrame() const { return currentFrame; }

@@ -18,24 +18,28 @@ public:
     const Matrix& getViewMatrix() const { return GetViewMatrix(); }
     const Matrix& getProjectionMatrix() const { return GetProjectionMatrix(); }
 
+    // Función para obtener forward vector
+    Vector3 GetForward() const {
+        return Vector3::Transform(Vector3(0, 0, 1), rotation);
+    }
+
 private:
     Vector3 position = { 0.0f, 2.0f, 10.0f };
     Quaternion rotation = Quaternion::Identity;
     Matrix view;
     Matrix projection;
 
-    Vector3 GetForward() const {
-        return Vector3::Transform(Vector3(0, 0, -1), rotation);
-    }
-
-    struct {
-        float polar = 0.0f;
-        float azimuthal = 0.0f;
-        Vector3 translation = { 0.0f, 2.0f, 10.0f };
-    } params;
-
+    // Variables para zoom con rueda (añadido extra)
+    int lastScrollValue = 0;
     int dragPosX = 0;
     int dragPosY = 0;
+
+    // Parámetros como los tiene tu profesor
+    struct {
+        float polar = 0.0f;      // Rotación horizontal (yaw)
+        float azimuthal = 0.0f;  // Rotación vertical (pitch)
+        Vector3 translation = { 0.0f, 2.0f, 10.0f };
+    } params;
 
     float fov = 0.785f; // 45°
     float aspectRatio = 1.77f;
