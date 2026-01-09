@@ -1,5 +1,6 @@
 #include "Globals.h"
 #include "Model.h"
+
 #include "gltf_utils.h" 
 #include <filesystem>
 
@@ -53,31 +54,47 @@ void Model::Load(const char* assetFileName)
     }
 }
 
-void Model::Render(ID3D12GraphicsCommandList* commandList) const
+void Model::Render(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialBufferAddress) const
 {
     if (meshes.empty())
         return;
-
-    // Bind the vertex input layout
-    D3D12_INPUT_ELEMENT_DESC layout[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-    };
-
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    // Render each mesh
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); 
     for (const auto& mesh : meshes)
     {
-        // Bind mesh buffers
+        //Debug Print
+        char debugBuf[256];
+       
+        sprintf_s(debugBuf, "Rendering Mesh: Verts %u, Indices %u, MatIdx %u\n",
+            mesh.getVertexCount(), mesh.getIndexCount(), mesh.getMaterialIndex());
+        OutputDebugStringA(debugBuf);
+
+        // Material Binding (Placeholder)
+        UINT matIdx = mesh.getMaterialIndex();
+        if (matIdx < materials.size())
+        {
+            const Material& mat = materials[matIdx];
+            commandList->SetGraphicsRootConstantBufferView(1, materialBufferAddress);
+            if (mat.texture != nullptr)
+            {
+            }
+        }
+        if (materials[matIdx].texture != nullptr)
+        {
+            //commandList->SetGraphicsRootDescriptorTable(2, materials[matIdx].getSRVHandle());
+        }
+
+        // Bind Buffers
         mesh.BindBuffers(commandList);
 
-        // TODO: Bind material here
-        // - Bind material CBV (with baseColor and hasTexture flag)
-        // - Bind texture SRV (or null descriptor)
-
-        // Draw the mesh
-        mesh.Draw(commandList);
+        //Draw
+        if (mesh.getIndexCount() > 0) // Check if indices exist
+        {
+            commandList->DrawIndexedInstanced(mesh.getIndexCount(), 1, 0, 0, 0);
+        }
+        else
+        {
+            commandList->DrawInstanced(mesh.getVertexCount(), 1, 0, 0);
+        }
     }
 }
+

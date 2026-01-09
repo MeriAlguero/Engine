@@ -91,6 +91,7 @@ void ModuleRenderer::render() {
     if (modelLoaded)
     {
        renderModel();
+       LOG("Loading the ducky for you");
     }
 
     renderDebugDraw();
@@ -263,7 +264,7 @@ void ModuleRenderer::renderModel()
     DirectX::SimpleMath::Matrix modelMatrix = DirectX::SimpleMath::Matrix::Identity;
 
  
-    float scale = 10.0f; 
+    float scale = 1.0f; 
     modelMatrix = DirectX::SimpleMath::Matrix::CreateScale(scale);
 
     // Also try rotating if it's facing wrong direction
@@ -313,7 +314,7 @@ void ModuleRenderer::renderModel()
 
     // Render the model
     LOG("renderModel: Calling model.Render()...");
-    model.Render(commandList);
+    model.Render(commandList, materialConstantBuffer->GetGPUVirtualAddress());
     LOG("renderModel: Finished rendering");
 }
 

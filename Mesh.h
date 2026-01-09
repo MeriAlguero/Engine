@@ -25,6 +25,12 @@ public:
     UINT vertexCount = 0;
     UINT indexCount = 0;
     UINT materialIndex = 0;
+
+    UINT getVertexCount() const { return vertexCount; }
+    UINT getIndexCount() const { return indexCount; }
+    UINT getMaterialIndex() const { return materialIndex; }
+
+  
     bool hasIndices = false;
     DXGI_FORMAT indexFormat = DXGI_FORMAT_R32_UINT;
 

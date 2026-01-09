@@ -31,12 +31,11 @@ inline bool loadAccessorData(uint8_t* data, size_t elemSize, size_t stride, size
 		const uint8_t* bufferData = reinterpret_cast<const uint8_t*>( &(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]));
 		//If it haves custom stride of it haves to use natural stride
 		size_t bufferStride = view.byteStride == 0 ? defaultStride : view.byteStride;
-
 		for (uint32_t i = 0; i < elemCount; ++i)
 		{
-			memcpy(data, bufferData, elemSize); //Copy one element from source to destination
-			data += stride;
-			bufferData += bufferStride;
+			memcpy(data, bufferData, elemSize); 
+			data += stride; 
+			bufferData += bufferStride; 
 		}
 		return true;
 

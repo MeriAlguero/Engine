@@ -12,7 +12,7 @@ public:
     // Load model from glTF file
     void Load(const char* assetFileName);
     // Render the entire model
-    void Render(ID3D12GraphicsCommandList* commandList) const;
+    void Render(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialBufferAddress) const;
     
    
 };
